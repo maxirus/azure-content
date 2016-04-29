@@ -32,7 +32,7 @@ This article assumes that you have already installed a CentOS (or similar deriva
 
 **CentOS installation notes**
 
-- The VHDX format is not supported in Azure, only **fixed VHD**.  You can convert the disk to VHD format using Hyper-V Manager or the convert-vhd cmdlet.
+- The VHDX format is not supported in Azure, only **fixed VHD**.  You can convert the disk to VHD format using Hyper-V Manager or the convert-vhd cmdlet. For VirtualBox this means selecting **Fixed size** as opposed to the default dynamically allocated when creating the disk.
 
 - When installing the Linux system it is recommended that you use standard partitions rather than LVM (often the default for many installations). This will avoid LVM name conflicts with cloned VMs, particularly if an OS disk ever needs to be attached to another VM for troubleshooting.  LVM or [RAID](virtual-machines-linux-configure-raid.md) may be used on data disks if preferred.
 
@@ -306,9 +306,9 @@ Preparing a CentOS 7 virtual machine for Azure is very similar to CentOS 6, howe
 
 10.	Modify the kernel boot line in your grub configuration to include additional kernel parameters for Azure. To do this, open "/etc/default/grub" in a text editor and edit the `GRUB_CMDLINE_LINUX` parameter, for example:
 
-		GRUB_CMDLINE_LINUX="rootdelay=300 console=ttyS0 earlyprintk=ttyS0"
+		GRUB_CMDLINE_LINUX="rootdelay=300 console=ttyS0 earlyprintk=ttyS0 net.ifnames=0"
 
-	This will also ensure all console messages are sent to the first serial port, which can assist Azure support with debugging issues. In addition to the above, it is recommended to *remove* the following parameters:
+	This will also ensure all console messages are sent to the first serial port, which can assist Azure support with debugging issues. It also turns off the new CentOS 7 naming conventions for NICs. In addition to the above, it is recommended to *remove* the following parameters:
 
 		rhgb quiet crashkernel=auto
 
@@ -332,11 +332,16 @@ Preparing a CentOS 7 virtual machine for Azure is very similar to CentOS 6, howe
 
         # dracut –f -v
 
-14. Install the Azure Linux Agent by running the following command:
+14. Reboot the system allowing kernel changes to take effect:
+
+		# sudo reboot now
+	
+15. Install the Azure Linux Agent by running the following command:
 
 		# sudo yum install WALinuxAgent
+		# sudo systemctl enable waagent
 
-15.	Do not create swap space on the OS disk.
+16.	Do not create swap space on the OS disk.
 
 	The Azure Linux Agent can automatically configure swap space using the local resource disk that is attached to the VM after provisioning on Azure. Note that the local resource disk is a *temporary* disk, and might be emptied when the VM is deprovisioned. After installing the Azure Linux Agent (see previous step), modify the following parameters in /etc/waagent.conf appropriately:
 
@@ -346,13 +351,15 @@ Preparing a CentOS 7 virtual machine for Azure is very similar to CentOS 6, howe
 		ResourceDisk.EnableSwap=y
 		ResourceDisk.SwapSizeMB=2048    ## NOTE: set this to whatever you need it to be.
 
-16.	Run the following commands to deprovision the virtual machine and prepare it for provisioning on Azure:
+17.	Run the following commands to deprovision the virtual machine and prepare it for provisioning on Azure:
 
 		# sudo waagent -force -deprovision
 		# export HISTSIZE=0
 		# logout
+	
+	You can ignore the following error: `[Errno 5] Input/output error`
 
-17. Click **Action -> Shut Down** in Hyper-V Manager. Your Linux VHD is now ready to be uploaded to Azure.
+18. Click **Action -> Shut Down** in Hyper-V Manager. Your Linux VHD is now ready to be uploaded to Azure.
 
 ## Next steps
 You're now ready to use your CentOS Linux virtual hard disk to create new virtual machines in Azure. If this is the first time that you're uploading the .vhd file to Azure, see steps 2 and 3 in [Creating and uploading a virtual hard disk that contains the Linux operating system](virtual-machines-linux-classic-create-upload-vhd.md).
